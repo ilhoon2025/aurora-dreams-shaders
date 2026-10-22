@@ -39,16 +39,19 @@ def call(method, path, body=None, ctype=None):
         sys.exit(f"{method} {path} -> {e.code}: {e.read().decode()[:500]}")
 
 
-def project_exists():
+def get_project():
+    """Authenticated lookup (drafts are private). Returns the project dict or None."""
+    req = urllib.request.Request(f"https://api.modrinth.com/v2/project/{SLUG}",
+                                 headers={"Authorization": TOKEN, "User-Agent": UA})
     try:
-        urllib.request.urlopen(urllib.request.Request(
-            f"https://api.modrinth.com/v2/project/{SLUG}", headers={"User-Agent": UA}))
-        return True
+        with urllib.request.urlopen(req) as r:
+            return json.loads(r.read())
     except urllib.error.HTTPError:
-        return False
+        return None
 
 
-if not project_exists():
+project = get_project()
+if project is None:
     data = {
         "slug": SLUG, "title": "Aurora Dreams", "project_type": "shader",
         "description": "A cinematic shader: aurora night sky, volumetric clouds, soft shadows, SSR water, coloured light.",
@@ -60,13 +63,18 @@ if not project_exists():
         "is_draft": True, "initial_versions": [], "organization_id": None,
     }
     body, ct = multipart({"data": json.dumps(data)}, {})
-    print("created project:", call("POST", "/project", body, ct).get("id"))
+    project = call("POST", "/project", body, ct)
+    print("created project:", project.get("id"))
+    icon = ROOT / "assets" / "logo_256.png"
+    if icon.exists():
+        call("PATCH", f"/project/{SLUG}/icon?ext=png", icon.read_bytes(), "image/png")
+        print("icon uploaded")
 
 vdata = {
     "name": f"Aurora Dreams {VERSION}", "version_number": VERSION,
     "changelog": "See https://github.com/ilhoon2025/aurora-dreams-shaders/releases",
     "dependencies": [], "game_versions": GAME_VERSIONS, "version_type": "release",
-    "loaders": ["iris", "optifine"], "featured": True, "project_id": SLUG,
+    "loaders": ["iris", "optifine"], "featured": True, "project_id": project["id"],
     "file_parts": ["file"], "primary_file": "file",
 }
 body, ct = multipart({"data": json.dumps(vdata)}, {"file": (ZIP.name, ZIP.read_bytes(), "application/zip")})

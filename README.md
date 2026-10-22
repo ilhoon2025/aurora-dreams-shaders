@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.png" width="160" alt="Aurora Dreams"></p>
+
 # Aurora Dreams
 
 A dreamy, cinematic shader pack for Minecraft (Java Edition) built for **Iris** and **OptiFine**.
