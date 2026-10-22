@@ -27,6 +27,10 @@ uniform vec3 upPosition;
 uniform float viewWidth;
 uniform float viewHeight;
 uniform float frameTimeCounter;
+uniform int heldBlockLightValue;
+uniform int heldBlockLightValue2;
+uniform int heldItemId;
+uniform int heldItemId2;
 
 varying vec2 texcoord;
 varying vec3 lightCol;
@@ -88,6 +92,30 @@ float ssao(vec3 vpos, vec3 n) {
     return clamp(1.0 - occ / 6.0 * 2.4, 0.0, 1.0);
 }
 
+
+// colour of the light a held item gives off (ids come from item.properties)
+vec3 heldColor(int id) {
+    if (id == 10011) return vec3(0.12, 0.72, 1.00);  // soul torch / soul lantern
+    if (id == 10013) return vec3(1.00, 0.10, 0.05);  // redstone torch
+    if (id == 10014) return vec3(1.00, 0.78, 0.30);  // glowstone, shroomlight, ochre froglight
+    if (id == 10015) return vec3(0.45, 0.92, 1.00);  // sea lantern, pearlescent froglight
+    if (id == 10016) return vec3(0.35, 1.00, 0.45);  // verdant froglight
+    if (id == 10017) return vec3(0.30, 1.00, 0.65);  // copper torch / lantern
+    return vec3(1.00, 0.52, 0.20);                   // torch, lantern, unknown
+}
+
+vec3 handLight(vec3 vpos, vec3 n, int level, int id, vec3 handPos) {
+    if (level < 1) return vec3(0.0);
+    float r = float(level) * 0.95;
+    vec3 d = handPos - vpos;
+    float dist = length(d);
+    float att = clamp(1.0 - dist / r, 0.0, 1.0);
+    att *= att;
+    float diff = clamp(dot(n, d / dist) * 0.75 + 0.25, 0.0, 1.0);
+    float flick = 1.0 + 0.06 * sin(frameTimeCounter * 12.0) + 0.04 * sin(frameTimeCounter * 23.0 + 1.7);
+    return heldColor(id) * att * diff * (float(level) / 15.0) * 3.4 * flick;
+}
+
 void main() {
     vec4 tex = texture2D(colortex0, texcoord);
     float depth = texture2D(depthtex0, texcoord).r;
@@ -147,7 +175,25 @@ void main() {
         direct += lightCol * shadow * back * 0.9 * vec3(0.75, 1.0, 0.35);
         albedo *= vec3(1.04, 1.07, 0.93);
     }
-    vec3 light = direct + (sky + blockLight) * ao + vec3(0.012, 0.014, 0.02) * ao;
+    vec3 hand = handLight(vpos, n, heldBlockLightValue, heldItemId, vec3(0.35, -0.30, -0.25))
+              + handLight(vpos, n, heldBlockLightValue2, heldItemId2, vec3(-0.35, -0.30, -0.25));
 
-    gl_FragData[0] = vec4(albedo * light, 1.0);
+    vec3 light = direct + (sky + blockLight + hand) * ao + vec3(0.012, 0.014, 0.02) * ao;
+    vec3 color = albedo * light;
+
+    // glowing blocks: torches, lanterns, lava ... (flag 0.65) and ore flecks in their own colour (flag 0.8)
+    float maxc = max(tex.r, max(tex.g, tex.b));
+    float chroma = maxc - min(tex.r, min(tex.g, tex.b));
+    if (abs(flag - 0.65) < 0.05) {
+        float mask = smoothstep(0.6, 0.85, maxc);
+        float flick = 1.0 + 0.07 * sin(frameTimeCounter * 11.0 + feet.x * 3.0 + feet.z * 5.0);
+        color += albedo * mask * 4.5 * flick;
+    } else if (abs(flag - 0.8) < 0.05) {
+        float mask = max(smoothstep(0.10, 0.28, chroma), smoothstep(0.65, 0.88, maxc));
+        float pulse = 0.85 + 0.15 * sin(frameTimeCounter * 2.2 + feet.x * 1.7 + feet.y * 2.3 + feet.z * 1.3);
+        vec3 vivid = mix(vec3(dot(albedo, vec3(0.333))), albedo, 1.5);
+        color += max(vivid, 0.0) * mask * 3.2 * pulse;
+    }
+
+    gl_FragData[0] = vec4(color, 1.0);
 }
