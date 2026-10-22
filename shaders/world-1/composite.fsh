@@ -2,8 +2,11 @@
 // Nether: no sun, warm ember ambient lighting
 #include "/lib/settings.glsl"
 
+/*
 const int colortex0Format = RGB16F;
 const int colortex3Format = RGB16F;
+const int colortex4Format = RGB16F;
+*/
 
 uniform sampler2D colortex0;
 uniform sampler2D colortex1;

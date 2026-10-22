@@ -5,8 +5,11 @@
 const int shadowMapResolution = SHADOW_RES;
 const float shadowDistance = SHADOW_DIST;
 const float sunPathRotation = -25.0;
+/*
 const int colortex0Format = RGB16F;
 const int colortex3Format = RGB16F;
+const int colortex4Format = RGB16F;
+*/
 
 uniform sampler2D colortex0;
 uniform sampler2D colortex1;
@@ -105,13 +108,16 @@ void main() {
     }
 
     vec3 albedo = pow(tex.rgb, vec3(2.2));
+    bool foliage = abs(flag - 0.25) < 0.1;
     vec3 n = normalize(texture2D(colortex1, texcoord).xyz * 2.0 - 1.0);
+    if (foliage) n = normalize(mix(n, normalize(upPosition), 0.55));
     vec2 lm = data2.xy;
 
     vec3 vpos = toView(texcoord, depth);
     vec3 feet = (gbufferModelViewInverse * vec4(vpos, 1.0)).xyz;
     vec3 L = normalize(shadowLightPosition);
     float ndl = max(dot(n, L), 0.0);
+    if (foliage) ndl = clamp((dot(n, L) + 0.35) / 1.35, 0.0, 1.0);
     vec3 worldN = mat3(gbufferModelViewInverse) * n;
 
     float shadow = 1.0;
@@ -135,6 +141,12 @@ void main() {
     blockLight *= 1.0 - 0.6 * skyL * smoothstep(0.0, 1.5, dot(ambCol, vec3(0.33)));
 
     vec3 direct = lightCol * ndl * shadow;
+    if (foliage) {
+        // light shining through leaves and grass blades
+        float back = pow(clamp(dot(normalize(vpos), L), 0.0, 1.0), 4.0);
+        direct += lightCol * shadow * back * 0.9 * vec3(0.75, 1.0, 0.35);
+        albedo *= vec3(1.04, 1.07, 0.93);
+    }
     vec3 light = direct + (sky + blockLight) * ao + vec3(0.012, 0.014, 0.02) * ao;
 
     gl_FragData[0] = vec4(albedo * light, 1.0);

@@ -1,5 +1,6 @@
 #version 120
-// Pass 2: water reflections (SSR + sky + aurora), atmospheric fog, underwater look
+// Pass 2: water (refraction, depth absorption, foam, SSR + sky/cloud/aurora reflections),
+// atmospheric fog, underwater look
 #include "/lib/settings.glsl"
 #include "/lib/sky.glsl"
 
@@ -12,6 +13,7 @@ uniform sampler2D depthtex1;
 uniform mat4 gbufferProjection;
 uniform mat4 gbufferProjectionInverse;
 uniform vec3 shadowLightPosition;
+uniform vec3 cameraPosition;
 uniform float far;
 uniform int isEyeInWater;
 
@@ -26,11 +28,11 @@ vec3 toView(vec2 uv, float d) {
 }
 
 vec4 traceSSR(vec3 vpos, vec3 rd) {
-    float stepL = 0.25;
+    float stepL = 0.2;
     vec3 p = vpos;
-    for (int i = 0; i < 32; i++) {
+    for (int i = 0; i < 40; i++) {
         p += rd * stepL;
-        stepL *= 1.18;
+        stepL *= 1.15;
         vec4 pp = gbufferProjection * vec4(p, 1.0);
         if (pp.w <= 0.0) break;
         vec2 uv = pp.xy / pp.w * 0.5 + 0.5;
@@ -58,21 +60,46 @@ void main() {
         vec3 data2 = texture2D(colortex2, texcoord).rgb;
         if (data2.b > 0.9) {
             vec3 n = normalize(texture2D(colortex1, texcoord).xyz * 2.0 - 1.0);
+            float skyVis = smoothstep(0.2, 0.95, data2.g);
+
+            // --- refraction and depth absorption
+            vec2 ruv = clamp(texcoord + n.xy * 0.035 / (1.0 + dist * 0.06), 0.001, 0.999);
+            if (texture2D(depthtex1, ruv).r <= depth) ruv = texcoord;
+            float d1 = texture2D(depthtex1, ruv).r;
+            vec3 under = texture2D(colortex0, ruv).rgb;
+            float thick = d1 < 1.0 ? max(length(toView(ruv, d1)) - dist, 0.0) : 24.0;
+
+            vec3 absorb = exp(-thick * vec3(0.55, 0.14, 0.08));
+            vec3 scatter = (ambCol * 0.55 + lightCol * 0.12) * vec3(0.04, 0.34, 0.46) * (0.35 + 0.65 * skyVis);
+            under = under * absorb + scatter * (1.0 - absorb);
+            color = under;
+
+            // --- foam along shores
+            float foam = 0.0;
+#ifdef WATER_FOAM
+            vec3 feet = (gbufferModelViewInverse * vec4(vpos, 1.0)).xyz + cameraPosition;
+            float shore = 1.0 - smoothstep(0.0, 0.7, thick);
+            float fn = fbm(feet.xz * 2.6 + vec2(frameTimeCounter * 0.35, -frameTimeCounter * 0.2));
+            foam = shore * smoothstep(0.42, 0.7, fn + shore * 0.25);
+            color = mix(color, (ambCol + lightCol * 0.45) * 0.95, clamp(foam, 0.0, 0.9));
+#endif
+
+            // --- reflections
             vec3 rd = reflect(viewDir, n);
             float cosT = clamp(dot(-viewDir, n), 0.0, 1.0);
             float fres = clamp(0.02 + 0.98 * pow(1.0 - cosT, 5.0), 0.0, 1.0);
-            fres = mix(fres, 1.0, 0.04);
+            fres = mix(fres, 1.0, 0.03);
 
-            vec3 refl = skyFull(rd) * smoothstep(0.25, 0.95, data2.g);
+            vec3 refl = skyFull(rd) * skyVis;
 #ifdef SSR
             vec4 hit = traceSSR(vpos, rd);
             refl = mix(refl, hit.rgb, hit.a);
 #endif
             vec3 L = normalize(shadowLightPosition);
-            float glint = pow(max(dot(rd, L), 0.0), 600.0);
-            refl += lightCol * glint * 6.0 * smoothstep(0.5, 0.95, data2.g);
+            float glint = pow(max(dot(rd, L), 0.0), 700.0);
+            refl += lightCol * glint * 7.0 * smoothstep(0.5, 0.95, data2.g);
 
-            color = mix(color, refl, fres);
+            color = mix(color, refl, fres * (1.0 - clamp(foam, 0.0, 0.9)));
         }
     }
 

@@ -1,4 +1,4 @@
-// Procedural sky: gradient, sunset, sun/moon glow, stars, aurora borealis.
+// Procedural sky: gradient, sunset, sun/moon glow, stars, aurora borealis, volumetric clouds.
 // Requires lib/settings.glsl. All colours returned are linear HDR.
 uniform vec3 sunPosition;
 uniform vec3 upPosition;
@@ -37,12 +37,32 @@ float fbm(vec2 p) {
     return s;
 }
 
+float fbm3(vec2 p) {
+    float a = 0.5;
+    float s = 0.0;
+    for (int i = 0; i < 3; i++) {
+        s += a * vnoise(p);
+        p = p * 2.07 + vec2(11.7, 5.3);
+        a *= 0.5;
+    }
+    return s / 0.875;
+}
+
 float skySunHeight() {
     return dot(normalize(sunPosition), normalize(upPosition));
 }
 
 float skyNightFactor() {
     return 1.0 - smoothstep(-0.25, 0.0, skySunHeight());
+}
+
+// colour of the active light (sun or moon) as seen by the sky
+vec3 skyLightColor() {
+    float sh = skySunHeight();
+    float warm = pow(1.0 - smoothstep(0.0, 0.5, sh), 1.6);
+    vec3 sunC = mix(vec3(1.0, 0.92, 0.80), vec3(1.0, 0.40, 0.12), warm) * smoothstep(-0.06, 0.12, sh) * 2.8;
+    vec3 moonC = vec3(0.40, 0.55, 1.0) * 0.45 * smoothstep(-0.06, 0.12, -sh);
+    return (sunC + moonC) * mix(1.0, 0.25, rainStrength);
 }
 
 // dirV: normalised view-space direction
@@ -53,7 +73,7 @@ vec3 skyBase(vec3 dirV) {
     float h = dot(dirV, up);
     float day = smoothstep(-0.12, 0.22, sh);
 
-    vec3 zenD = pow(vec3(0.10, 0.30, 0.82), vec3(2.2));
+    vec3 zenD = pow(vec3(0.08, 0.27, 0.80), vec3(2.2));
     vec3 horD = pow(vec3(0.62, 0.82, 1.00), vec3(2.2));
     vec3 zenN = pow(vec3(0.02, 0.04, 0.14), vec3(2.2));
     vec3 horN = pow(vec3(0.10, 0.16, 0.34), vec3(2.2)) * 0.8;
@@ -76,10 +96,8 @@ vec3 skyBase(vec3 dirV) {
     col += vec3(1.0, 0.78, 0.5) * (pow(sd, 48.0) * 0.7 + pow(sd, 6.0) * 0.12) * smoothstep(-0.1, 0.1, sh);
     col += vec3(0.45, 0.6, 1.0) * (pow(md, 60.0) * 0.5 + pow(md, 8.0) * 0.06) * smoothstep(-0.1, 0.1, -sh);
 
-    // below the horizon fades into deep blue
     col *= mix(1.0, 0.55, clamp(-h * 3.0, 0.0, 1.0));
 
-    // overcast
     float lum = dot(col, vec3(0.333));
     col = mix(col, vec3(lum) * vec3(0.75, 0.8, 0.88), rainStrength * 0.75);
     return col;
@@ -122,8 +140,68 @@ vec3 skyAurora(vec3 wd, float night) {
     return acc;
 }
 
+#ifdef CLOUDS
+const float CLOUD_H0 = 650.0;
+const float CLOUD_H1 = 950.0;
+
+float cloudDensity(vec2 xz, float hf) {
+    vec2 p = xz * 0.0021 + vec2(frameTimeCounter * 0.0045, frameTimeCounter * 0.0018);
+    float n = fbm3(p);
+    float thr = mix(0.66, 0.40, CLOUD_COVERAGE) - rainStrength * 0.12;
+    float d = smoothstep(thr, thr + 0.22, n);
+    d *= smoothstep(0.0, 0.2, hf) * smoothstep(1.0, 0.5, hf);
+    return d;
+}
+
+float hgPhase(float c, float g) {
+    return (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * c, 1.5) * 0.25;
+}
+
+// returns (premultiplied scattered light, transmittance)
+vec4 skyClouds(vec3 wd, vec3 Ldir, vec3 Lcol, vec3 ambC) {
+    if (wd.y < 0.02) return vec4(0.0, 0.0, 0.0, 1.0);
+    float tA = CLOUD_H0 / wd.y;
+    float tB = CLOUD_H1 / wd.y;
+    const int N = 12;
+    float dt = (tB - tA) / float(N);
+    float jit = hash12(gl_FragCoord.xy);
+    float cosA = dot(wd, Ldir);
+    float ph = mix(hgPhase(cosA, 0.65), hgPhase(cosA, -0.25), 0.4) * 3.2;
+
+    float trans = 1.0;
+    vec3 col = vec3(0.0);
+    for (int i = 0; i < N; i++) {
+        float t = tA + (float(i) + jit) * dt;
+        vec3 p = wd * t;
+        float hf = (p.y - CLOUD_H0) / (CLOUD_H1 - CLOUD_H0);
+        float d = cloudDensity(p.xz, hf);
+        if (d > 0.004) {
+            vec3 p1 = p + Ldir * 70.0;
+            vec3 p2 = p + Ldir * 190.0;
+            float l1 = cloudDensity(p1.xz, (p1.y - CLOUD_H0) / (CLOUD_H1 - CLOUD_H0));
+            float l2 = cloudDensity(p2.xz, (p2.y - CLOUD_H0) / (CLOUD_H1 - CLOUD_H0));
+            float shade = exp(-(l1 * 1.2 + l2 * 1.6) * 2.4);
+            vec3 lit = Lcol * shade * ph + ambC * (0.55 + 0.45 * hf);
+            float stepT = exp(-d * dt * 0.016);
+            col += trans * (1.0 - stepT) * lit;
+            trans *= stepT;
+        }
+    }
+    float fade = smoothstep(0.02, 0.2, wd.y);
+    return vec4(col * fade, mix(1.0, trans, fade));
+}
+#endif
+
 vec3 skyFull(vec3 dirV) {
     vec3 wd = mat3(gbufferModelViewInverse) * dirV;
     float night = skyNightFactor();
-    return skyBase(dirV) + skyStars(wd, night) + skyAurora(wd, night);
+    vec3 sky = skyBase(dirV) + skyStars(wd, night) + skyAurora(wd, night);
+#ifdef CLOUDS
+    vec3 sunW = mat3(gbufferModelViewInverse) * normalize(sunPosition);
+    vec3 Ldir = skySunHeight() > -0.05 ? sunW : -sunW;
+    vec3 ambC = skyBase(normalize(upPosition)) * 0.9 + vec3(0.01, 0.012, 0.02);
+    vec4 cl = skyClouds(wd, Ldir, skyLightColor(), ambC);
+    sky = sky * cl.a + cl.rgb;
+#endif
+    return sky;
 }

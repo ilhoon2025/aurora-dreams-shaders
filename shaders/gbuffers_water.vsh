@@ -1,4 +1,6 @@
 #version 120
+#include "/lib/settings.glsl"
+#include "/lib/wave.glsl"
 
 attribute vec4 mc_Entity;
 
@@ -24,5 +26,10 @@ void main() {
 
     vec4 pos = gbufferModelViewInverse * (gl_ModelViewMatrix * gl_Vertex);
     worldPos = pos.xyz + cameraPosition;
+
+    // real vertex displacement: the whole surface heaves
+    if (isWater > 0.5 && worldNormal.y > 0.5) {
+        pos.y += waveH(worldPos.xz) * 0.06 * WATER_WAVE - 0.03;
+    }
     gl_Position = gl_ProjectionMatrix * (gbufferModelView * pos);
 }

@@ -1,17 +1,25 @@
 #version 120
-// Bloom, vertical pass
-uniform sampler2D colortex3;
+// Bloom blur (composite3)
+uniform sampler2D colortex0;
+uniform float viewWidth;
 uniform float viewHeight;
 
 varying vec2 texcoord;
 
+vec3 tap(vec2 uv) {
+    vec3 s = texture2D(colortex0, uv).rgb;
+    float l = dot(s, vec3(0.333));
+    s = s * clamp((l - 1.0) / 1.6, 0.0, 1.0) + s * 0.04;
+    return s;
+}
+
 void main() {
-    float px = 1.0 / viewHeight;
+    vec2 px = vec2(1.0, 0.0) / vec2(viewWidth, viewHeight) * 3.0;
     vec3 sum = vec3(0.0);
     float wsum = 0.0;
-    for (int i = -6; i <= 6; i++) {
-        float w = exp(-float(i * i) / 18.0);
-        sum += texture2D(colortex3, texcoord + vec2(0.0, float(i) * px * 3.0)).rgb * w;
+    for (int i = -7; i <= 7; i++) {
+        float w = exp(-float(i * i) / 22.0);
+        sum += tap(texcoord + px * float(i)) * w;
         wsum += w;
     }
 /* DRAWBUFFERS:3 */
