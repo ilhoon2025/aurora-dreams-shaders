@@ -63,11 +63,11 @@ float getShadow(vec3 feet, vec3 worldN, float ndl) {
     float rot = ign(gl_FragCoord.xy) * 6.2831853;
     float rad = (2.2 / float(SHADOW_RES)) * (0.6 + d);
     float s = 0.0;
-    for (int i = 0; i < 14; i++) {
-        vec2 o = vogel(i, 14, rot) * rad;
+    for (int i = 0; i < 10; i++) {
+        vec2 o = vogel(i, 10, rot) * rad;
         s += step(sp.z - bias, texture2D(shadowtex1, sp.xy + o).r);
     }
-    return s / 14.0;
+    return s / 10.0;
 }
 
 float ssao(vec3 vpos, vec3 n) {
@@ -75,9 +75,9 @@ float ssao(vec3 vpos, vec3 n) {
     float r = clamp(0.5 * gbufferProjection[1][1] / max(-vpos.z, 0.5) * 0.5, 0.003, 0.05);
     vec2 asp = vec2(viewHeight / viewWidth, 1.0);
     float occ = 0.0;
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 6; i++) {
         float a = rot + float(i) * 2.39996;
-        float rr = (float(i) + 1.0) / 8.0;
+        float rr = (float(i) + 1.0) / 6.0;
         vec2 suv = texcoord + vec2(cos(a), sin(a)) * r * rr * asp;
         float sd = texture2D(depthtex0, suv).r;
         if (sd >= 1.0) continue;
@@ -85,7 +85,7 @@ float ssao(vec3 vpos, vec3 n) {
         float len = length(dv);
         occ += max(dot(n, dv / len) - 0.12, 0.0) / (1.0 + len * len * 1.5);
     }
-    return clamp(1.0 - occ / 8.0 * 2.4, 0.0, 1.0);
+    return clamp(1.0 - occ / 6.0 * 2.4, 0.0, 1.0);
 }
 
 void main() {

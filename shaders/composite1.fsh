@@ -30,9 +30,9 @@ vec3 toView(vec2 uv, float d) {
 vec4 traceSSR(vec3 vpos, vec3 rd) {
     float stepL = 0.2;
     vec3 p = vpos;
-    for (int i = 0; i < 40; i++) {
+    for (int i = 0; i < 24; i++) {
         p += rd * stepL;
-        stepL *= 1.15;
+        stepL *= 1.25;
         vec4 pp = gbufferProjection * vec4(p, 1.0);
         if (pp.w <= 0.0) break;
         vec2 uv = pp.xy / pp.w * 0.5 + 0.5;

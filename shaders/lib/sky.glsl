@@ -21,31 +21,26 @@ float hash13(vec3 p3) {
 float vnoise(vec2 p) {
     vec2 i = floor(p);
     vec2 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
+    f = f * f * f * (f * (f * 6.0 - 15.0) + 10.0); // quintic: no visible grid
     return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), f.x),
                mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 
-float fbm(vec2 p) {
-    float a = 0.5;
-    float s = 0.0;
-    for (int i = 0; i < 4; i++) {
-        s += a * vnoise(p);
-        p = p * 2.03 + vec2(17.1, 9.2);
-        a *= 0.5;
-    }
-    return s;
-}
+const mat2 ROT = mat2(0.80, -0.60, 0.60, 0.80);
 
-float fbm3(vec2 p) {
+float fbm(vec2 p) {
     float a = 0.5;
     float s = 0.0;
     for (int i = 0; i < 3; i++) {
         s += a * vnoise(p);
-        p = p * 2.07 + vec2(11.7, 5.3);
+        p = ROT * p * 2.03 + vec2(17.1, 9.2); // rotate each octave
         a *= 0.5;
     }
     return s / 0.875;
+}
+
+float fbm3(vec2 p) {
+    return fbm(p);
 }
 
 float skySunHeight() {
@@ -73,7 +68,7 @@ vec3 skyBase(vec3 dirV) {
     float h = dot(dirV, up);
     float day = smoothstep(-0.12, 0.22, sh);
 
-    vec3 zenD = pow(vec3(0.08, 0.27, 0.80), vec3(2.2));
+    vec3 zenD = pow(vec3(0.16, 0.38, 0.82), vec3(2.2));
     vec3 horD = pow(vec3(0.62, 0.82, 1.00), vec3(2.2));
     vec3 zenN = pow(vec3(0.02, 0.04, 0.14), vec3(2.2));
     vec3 horN = pow(vec3(0.10, 0.16, 0.34), vec3(2.2)) * 0.8;
@@ -123,8 +118,8 @@ vec3 skyAurora(vec3 wd, float night) {
 #ifdef AURORA
     if (wd.y < 0.03 || night < 0.01) return acc;
     float t = frameTimeCounter;
-    for (int i = 0; i < 14; i++) {
-        float fi = float(i) / 13.0;
+    for (int i = 0; i < 9; i++) {
+        float fi = float(i) / 8.0;
         float hgt = 6.0 + fi * 5.0;
         vec2 p = wd.xz / wd.y * hgt;
         float n = fbm(p * 0.045 + vec2(t * 0.012, fi * 0.7));
@@ -135,60 +130,44 @@ vec3 skyAurora(vec3 wd, float night) {
         col = mix(col, vec3(1.0, 0.2, 0.55), smoothstep(0.85, 1.0, fi) * 0.5);
         acc += col * band * rays * (1.0 - fi * 0.45);
     }
-    acc *= 0.42 * smoothstep(0.03, 0.4, wd.y) * night * (1.0 - rainStrength) * AURORA_INTENSITY;
+    acc *= 0.62 * smoothstep(0.03, 0.4, wd.y) * night * (1.0 - rainStrength) * AURORA_INTENSITY;
 #endif
     return acc;
 }
 
 #ifdef CLOUDS
-const float CLOUD_H0 = 650.0;
-const float CLOUD_H1 = 950.0;
-
-float cloudDensity(vec2 xz, float hf) {
-    vec2 p = xz * 0.0021 + vec2(frameTimeCounter * 0.0045, frameTimeCounter * 0.0018);
-    float n = fbm3(p);
-    float thr = mix(0.66, 0.40, CLOUD_COVERAGE) - rainStrength * 0.12;
-    float d = smoothstep(thr, thr + 0.22, n);
-    d *= smoothstep(0.0, 0.2, hf) * smoothstep(1.0, 0.5, hf);
-    return d;
-}
+const float CLOUD_H = 720.0;
 
 float hgPhase(float c, float g) {
     return (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * c, 1.5) * 0.25;
 }
 
+// Single thick layer, shaded by how much cloud lies toward the light.
+// 3 fbm + 1 noise lookups per pixel (cheap) instead of a ray march.
 // returns (premultiplied scattered light, transmittance)
 vec4 skyClouds(vec3 wd, vec3 Ldir, vec3 Lcol, vec3 ambC) {
-    if (wd.y < 0.02) return vec4(0.0, 0.0, 0.0, 1.0);
-    float tA = CLOUD_H0 / wd.y;
-    float tB = CLOUD_H1 / wd.y;
-    const int N = 12;
-    float dt = (tB - tA) / float(N);
-    float jit = hash12(gl_FragCoord.xy);
-    float cosA = dot(wd, Ldir);
-    float ph = mix(hgPhase(cosA, 0.65), hgPhase(cosA, -0.25), 0.4) * 3.2;
+    if (wd.y < 0.03) return vec4(0.0, 0.0, 0.0, 1.0);
+    float t = CLOUD_H / wd.y;
+    vec2 q = wd.xz * t * 0.0018 + vec2(frameTimeCounter * 0.004, frameTimeCounter * 0.0015);
+    float thr = mix(0.60, 0.38, CLOUD_COVERAGE) - rainStrength * 0.1;
 
-    float trans = 1.0;
-    vec3 col = vec3(0.0);
-    for (int i = 0; i < N; i++) {
-        float t = tA + (float(i) + jit) * dt;
-        vec3 p = wd * t;
-        float hf = (p.y - CLOUD_H0) / (CLOUD_H1 - CLOUD_H0);
-        float d = cloudDensity(p.xz, hf);
-        if (d > 0.004) {
-            vec3 p1 = p + Ldir * 70.0;
-            vec3 p2 = p + Ldir * 190.0;
-            float l1 = cloudDensity(p1.xz, (p1.y - CLOUD_H0) / (CLOUD_H1 - CLOUD_H0));
-            float l2 = cloudDensity(p2.xz, (p2.y - CLOUD_H0) / (CLOUD_H1 - CLOUD_H0));
-            float shade = exp(-(l1 * 1.2 + l2 * 1.6) * 2.4);
-            vec3 lit = Lcol * shade * ph + ambC * (0.55 + 0.45 * hf);
-            float stepT = exp(-d * dt * 0.016);
-            col += trans * (1.0 - stepT) * lit;
-            trans *= stepT;
-        }
-    }
-    float fade = smoothstep(0.02, 0.2, wd.y);
-    return vec4(col * fade, mix(1.0, trans, fade));
+    float detail = vnoise(q * 6.0 + 3.7) * 0.10;
+    float d = smoothstep(thr, thr + 0.15, fbm3(q) - detail + 0.05);
+    if (d < 0.003) return vec4(0.0, 0.0, 0.0, 1.0);
+
+    vec2 ls = Ldir.xz / max(Ldir.y, 0.25) * 0.10;
+    float dL = smoothstep(thr, thr + 0.15, fbm3(q + ls) - detail + 0.05);
+
+    float sunTerm = max(exp(-dL * 3.0), 0.22 * exp(-dL * 0.6));
+    float cosA = dot(wd, Ldir);
+    float ph = mix(hgPhase(cosA, 0.6), hgPhase(cosA, -0.2), 0.3) * 1.6 + 0.35;
+
+    vec3 grey = vec3(dot(ambC, vec3(0.333)));
+    vec3 amb = mix(ambC, grey, 0.7) * (0.65 + 0.35 * (1.0 - dL));
+    vec3 col = Lcol * sunTerm * ph * 0.8 + amb * 1.1;
+
+    float alpha = (1.0 - exp(-d * 4.0)) * smoothstep(0.03, 0.22, wd.y);
+    return vec4(col * alpha, 1.0 - alpha);
 }
 #endif
 

@@ -26,7 +26,7 @@ void main() {
     if (sp.w > 0.0 && isEyeInWater == 0) {
         vec2 suv = sp.xy / sp.w * 0.5 + 0.5;
         vec2 delta = suv - texcoord;
-        const int N = 28;
+        const int N = 16;
         vec2 stepv = delta / float(N) * 0.95;
         vec2 uv = texcoord + stepv * ign(gl_FragCoord.xy);
         float acc = 0.0;
@@ -38,7 +38,7 @@ void main() {
                 acc += step(1.0, texture2D(depthtex0, uv).r) * w;
             }
             wsum += w;
-            w *= 0.965;
+            w *= 0.94;
         }
         acc /= wsum;
         vec2 ad = delta * vec2(viewWidth / viewHeight, 1.0);

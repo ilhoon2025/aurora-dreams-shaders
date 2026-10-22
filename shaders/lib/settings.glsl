@@ -1,7 +1,7 @@
 // Aurora Dreams - user options (shown in the shader options screen)
 
 #define SHADOW_RES 2048 // [1024 2048 3072 4096]
-#define SHADOW_DIST 128.0 // [64.0 96.0 128.0 192.0]
+#define SHADOW_DIST 96.0 // [64.0 96.0 128.0 192.0]
 #define SSAO
 #define WAVING
 #define WAVING_STRENGTH 1.0 // [0.5 1.0 1.5 2.0]
