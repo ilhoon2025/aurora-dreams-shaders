@@ -1,0 +1,129 @@
+// Procedural sky: gradient, sunset, sun/moon glow, stars, aurora borealis.
+// Requires lib/settings.glsl. All colours returned are linear HDR.
+uniform vec3 sunPosition;
+uniform vec3 upPosition;
+uniform float frameTimeCounter;
+uniform float rainStrength;
+uniform mat4 gbufferModelViewInverse;
+
+float hash12(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+float hash13(vec3 p3) {
+    p3 = fract(p3 * 0.1031);
+    p3 += dot(p3, p3.zyx + 31.32);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+float vnoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), f.x),
+               mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+
+float fbm(vec2 p) {
+    float a = 0.5;
+    float s = 0.0;
+    for (int i = 0; i < 4; i++) {
+        s += a * vnoise(p);
+        p = p * 2.03 + vec2(17.1, 9.2);
+        a *= 0.5;
+    }
+    return s;
+}
+
+float skySunHeight() {
+    return dot(normalize(sunPosition), normalize(upPosition));
+}
+
+float skyNightFactor() {
+    return 1.0 - smoothstep(-0.25, 0.0, skySunHeight());
+}
+
+// dirV: normalised view-space direction
+vec3 skyBase(vec3 dirV) {
+    vec3 up = normalize(upPosition);
+    vec3 sunV = normalize(sunPosition);
+    float sh = dot(sunV, up);
+    float h = dot(dirV, up);
+    float day = smoothstep(-0.12, 0.22, sh);
+
+    vec3 zenD = pow(vec3(0.10, 0.30, 0.82), vec3(2.2));
+    vec3 horD = pow(vec3(0.62, 0.82, 1.00), vec3(2.2));
+    vec3 zenN = pow(vec3(0.02, 0.04, 0.14), vec3(2.2));
+    vec3 horN = pow(vec3(0.10, 0.16, 0.34), vec3(2.2)) * 0.8;
+    vec3 zen = mix(zenN, zenD, day);
+    vec3 hor = mix(horN, horD, day);
+
+    float hp = clamp(h, 0.0, 1.0);
+    vec3 col = mix(hor, zen, pow(hp, 0.55));
+
+    // sunrise / sunset
+    float sunset = 1.0 - smoothstep(0.0, 0.38, abs(sh + 0.02));
+    float sd = max(dot(dirV, sunV), 0.0);
+    float md = max(dot(dirV, -sunV), 0.0);
+    float lowBand = pow(1.0 - hp, 5.0);
+    vec3 sunsetCol = mix(vec3(1.0, 0.30, 0.10), vec3(1.0, 0.45, 0.62), clamp(h * 2.5 + 0.2, 0.0, 1.0));
+    col += sunsetCol * sunset * (pow(sd, 2.5) * 1.1 + lowBand * 0.55);
+    col = mix(col, col * vec3(0.9, 0.7, 0.9), sunset * 0.3 * (1.0 - sd));
+
+    // sun and moon glow
+    col += vec3(1.0, 0.78, 0.5) * (pow(sd, 48.0) * 0.7 + pow(sd, 6.0) * 0.12) * smoothstep(-0.1, 0.1, sh);
+    col += vec3(0.45, 0.6, 1.0) * (pow(md, 60.0) * 0.5 + pow(md, 8.0) * 0.06) * smoothstep(-0.1, 0.1, -sh);
+
+    // below the horizon fades into deep blue
+    col *= mix(1.0, 0.55, clamp(-h * 3.0, 0.0, 1.0));
+
+    // overcast
+    float lum = dot(col, vec3(0.333));
+    col = mix(col, vec3(lum) * vec3(0.75, 0.8, 0.88), rainStrength * 0.75);
+    return col;
+}
+
+vec3 skyStars(vec3 wd, float night) {
+    if (night < 0.01) return vec3(0.0);
+    vec3 p = wd * 230.0;
+    vec3 ip = floor(p);
+    vec3 fp = p - ip;
+    float h = hash13(ip);
+    if (h < 0.992) return vec3(0.0);
+    vec3 c = vec3(hash13(ip + 7.1), hash13(ip + 13.7), hash13(ip + 29.3));
+    float d = length(fp - (0.3 + c * 0.4));
+    float s = smoothstep(0.32, 0.0, d);
+    float tw = 0.7 + 0.3 * sin(frameTimeCounter * (1.5 + (h - 0.992) * 400.0) + h * 400.0);
+    vec3 tint = mix(vec3(0.7, 0.82, 1.0), vec3(1.0, 0.88, 0.72), c.x);
+    return tint * s * tw * (1.5 + c.y * 2.5) * night * (1.0 - rainStrength);
+}
+
+vec3 skyAurora(vec3 wd, float night) {
+    vec3 acc = vec3(0.0);
+#ifdef AURORA
+    if (wd.y < 0.03 || night < 0.01) return acc;
+    float t = frameTimeCounter;
+    for (int i = 0; i < 14; i++) {
+        float fi = float(i) / 13.0;
+        float hgt = 6.0 + fi * 5.0;
+        vec2 p = wd.xz / wd.y * hgt;
+        float n = fbm(p * 0.045 + vec2(t * 0.012, fi * 0.7));
+        float band = 1.0 - abs(n * 2.0 - 1.0);
+        band = pow(band, 7.0);
+        float rays = 0.55 + 0.45 * vnoise(vec2(p.x * 0.35 + t * 0.25, p.y * 0.06));
+        vec3 col = mix(vec3(0.10, 1.00, 0.45), vec3(0.50, 0.22, 1.00), smoothstep(0.25, 1.0, fi));
+        col = mix(col, vec3(1.0, 0.2, 0.55), smoothstep(0.85, 1.0, fi) * 0.5);
+        acc += col * band * rays * (1.0 - fi * 0.45);
+    }
+    acc *= 0.42 * smoothstep(0.03, 0.4, wd.y) * night * (1.0 - rainStrength) * AURORA_INTENSITY;
+#endif
+    return acc;
+}
+
+vec3 skyFull(vec3 dirV) {
+    vec3 wd = mat3(gbufferModelViewInverse) * dirV;
+    float night = skyNightFactor();
+    return skyBase(dirV) + skyStars(wd, night) + skyAurora(wd, night);
+}

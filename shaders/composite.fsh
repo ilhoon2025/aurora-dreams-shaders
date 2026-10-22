@@ -1,0 +1,141 @@
+#version 120
+// Pass 1: deferred lighting (sun/moon shadows, sky ambient, torch light, SSAO)
+#include "/lib/settings.glsl"
+
+const int shadowMapResolution = SHADOW_RES;
+const float shadowDistance = SHADOW_DIST;
+const float sunPathRotation = -25.0;
+const int colortex0Format = RGB16F;
+const int colortex3Format = RGB16F;
+
+uniform sampler2D colortex0;
+uniform sampler2D colortex1;
+uniform sampler2D colortex2;
+uniform sampler2D depthtex0;
+uniform sampler2D shadowtex1;
+
+uniform mat4 gbufferProjection;
+uniform mat4 gbufferProjectionInverse;
+uniform mat4 gbufferModelViewInverse;
+uniform mat4 shadowModelView;
+uniform mat4 shadowProjection;
+uniform vec3 shadowLightPosition;
+uniform vec3 upPosition;
+uniform float viewWidth;
+uniform float viewHeight;
+uniform float frameTimeCounter;
+
+varying vec2 texcoord;
+varying vec3 lightCol;
+varying vec3 ambCol;
+varying vec3 gndCol;
+
+#include "/lib/shadow.glsl"
+
+vec3 toView(vec2 uv, float d) {
+    vec4 p = gbufferProjectionInverse * vec4(vec3(uv, d) * 2.0 - 1.0, 1.0);
+    return p.xyz / p.w;
+}
+
+float ign(vec2 p) {
+    return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
+}
+
+vec2 vogel(int i, int n, float rot) {
+    float r = sqrt((float(i) + 0.5) / float(n));
+    float th = float(i) * 2.399963 + rot;
+    return r * vec2(cos(th), sin(th));
+}
+
+float getShadow(vec3 feet, vec3 worldN, float ndl) {
+    vec3 off = worldN * (0.10 + 0.22 * (1.0 - ndl));
+    vec4 sp = shadowProjection * (shadowModelView * vec4(feet + off, 1.0));
+    float d = shadowDistortFactor(sp.xy);
+    sp.xy /= d;
+    sp.z *= 0.5;
+    sp.xyz = sp.xyz * 0.5 + 0.5;
+    if (sp.x < 0.0 || sp.x > 1.0 || sp.y < 0.0 || sp.y > 1.0) return 1.0;
+
+    float bias = (0.0005 + 0.0016 * (1.0 - ndl)) * (0.5 + 2.0 * d * d) * (2048.0 / float(SHADOW_RES));
+    float rot = ign(gl_FragCoord.xy) * 6.2831853;
+    float rad = (2.2 / float(SHADOW_RES)) * (0.6 + d);
+    float s = 0.0;
+    for (int i = 0; i < 14; i++) {
+        vec2 o = vogel(i, 14, rot) * rad;
+        s += step(sp.z - bias, texture2D(shadowtex1, sp.xy + o).r);
+    }
+    return s / 14.0;
+}
+
+float ssao(vec3 vpos, vec3 n) {
+    float rot = ign(gl_FragCoord.xy + 17.0) * 6.2831853;
+    float r = clamp(0.5 * gbufferProjection[1][1] / max(-vpos.z, 0.5) * 0.5, 0.003, 0.05);
+    vec2 asp = vec2(viewHeight / viewWidth, 1.0);
+    float occ = 0.0;
+    for (int i = 0; i < 8; i++) {
+        float a = rot + float(i) * 2.39996;
+        float rr = (float(i) + 1.0) / 8.0;
+        vec2 suv = texcoord + vec2(cos(a), sin(a)) * r * rr * asp;
+        float sd = texture2D(depthtex0, suv).r;
+        if (sd >= 1.0) continue;
+        vec3 dv = toView(suv, sd) - vpos;
+        float len = length(dv);
+        occ += max(dot(n, dv / len) - 0.12, 0.0) / (1.0 + len * len * 1.5);
+    }
+    return clamp(1.0 - occ / 8.0 * 2.4, 0.0, 1.0);
+}
+
+void main() {
+    vec4 tex = texture2D(colortex0, texcoord);
+    float depth = texture2D(depthtex0, texcoord).r;
+
+/* DRAWBUFFERS:0 */
+    if (depth >= 1.0) {
+        gl_FragData[0] = tex; // sky already HDR linear
+        return;
+    }
+
+    vec4 data2 = texture2D(colortex2, texcoord);
+    float flag = data2.b;
+
+    // emissive / unlit objects
+    if (abs(flag - 0.5) < 0.1) {
+        gl_FragData[0] = vec4(pow(tex.rgb, vec3(2.2)) * 2.0, 1.0);
+        return;
+    }
+
+    vec3 albedo = pow(tex.rgb, vec3(2.2));
+    vec3 n = normalize(texture2D(colortex1, texcoord).xyz * 2.0 - 1.0);
+    vec2 lm = data2.xy;
+
+    vec3 vpos = toView(texcoord, depth);
+    vec3 feet = (gbufferModelViewInverse * vec4(vpos, 1.0)).xyz;
+    vec3 L = normalize(shadowLightPosition);
+    float ndl = max(dot(n, L), 0.0);
+    vec3 worldN = mat3(gbufferModelViewInverse) * n;
+
+    float shadow = 1.0;
+    if (ndl > 0.0) {
+        shadow = getShadow(feet, worldN, ndl);
+        float fade = smoothstep(SHADOW_DIST * 0.8, SHADOW_DIST, length(feet));
+        shadow = mix(shadow, smoothstep(0.85, 1.0, lm.y), fade);
+    }
+
+    float ao = 1.0;
+#ifdef SSAO
+    ao = ssao(vpos, n);
+#endif
+
+    float skyL = pow(lm.y, 2.2);
+    float hemi = dot(n, normalize(upPosition)) * 0.5 + 0.5;
+    vec3 sky = mix(gndCol, ambCol, hemi) * skyL;
+
+    float bl = pow(lm.x, 3.6);
+    vec3 blockLight = vec3(1.0, 0.50, 0.20) * bl * 2.4 * (1.0 + 0.04 * sin(frameTimeCounter * 9.0 + lm.x * 20.0));
+    blockLight *= 1.0 - 0.6 * skyL * smoothstep(0.0, 1.5, dot(ambCol, vec3(0.33)));
+
+    vec3 direct = lightCol * ndl * shadow;
+    vec3 light = direct + (sky + blockLight) * ao + vec3(0.012, 0.014, 0.02) * ao;
+
+    gl_FragData[0] = vec4(albedo * light, 1.0);
+}
