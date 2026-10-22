@@ -178,19 +178,18 @@ void main() {
     vec3 sky = mix(gndCol, ambCol, hemi) * skyL;
 
     float bl = pow(lm.x, 3.6);
+    // Vanilla block-light shape and falloff (lightmap), tinted toward the colour of the
+    // nearest glowing block. The tint fades in/out smoothly: no discs, no hard edges.
     vec3 warm = vec3(1.0, 0.50, 0.20);
-    vec3 spread = vec3(0.0);
 #ifdef EMITTER_LIGHT
     vec3 E = texture2D(colortex3, texcoord).rgb;
     float Em = max(E.r, max(E.g, E.b));
-    // hue of the nearest glowing thing replaces the default torch orange
-    warm = mix(warm, E / max(Em, 1e-4), smoothstep(0.0012, 0.010, Em));
-    spread = min(E * 70.0, vec3(1.1));
+    vec3 hue = E / max(Em, 1e-5);
+    float tintW = clamp(sqrt(Em / 0.006), 0.0, 1.0);   // compressive curve: long, gentle tail
+    warm = mix(warm, hue, tintW);
 #endif
     vec3 blockLight = warm * bl * 2.4 * (1.0 + 0.04 * sin(frameTimeCounter * 9.0 + lm.x * 20.0));
-    float dayAtten = 1.0 - 0.6 * skyL * smoothstep(0.0, 1.5, dot(ambCol, vec3(0.33)));
-    blockLight += spread;
-    blockLight *= dayAtten;
+    blockLight *= 1.0 - 0.6 * skyL * smoothstep(0.0, 1.5, dot(ambCol, vec3(0.33)));
 
     vec3 direct = lightCol * ndl * shadow * shadowTint;
     if (foliage) {
