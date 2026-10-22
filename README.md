@@ -13,6 +13,8 @@ A dreamy, cinematic shader pack for Minecraft (Java Edition) built for **Iris** 
 - Atmospheric haze and distance fog tinted by the sky; underwater fog
 - **Bloom**, ACES tonemapping, cool-shadow / warm-highlight grading, vignette, subtle chromatic aberration and grain
 - Simple Nether and End looks
+- Coloured light spreading: redstone torches tint their surroundings red, soul fire blue, ores glow and light the cave in their own colour
+- Stained-glass coloured shadows, lens flare, wet surfaces in rain
 - Presets: Performance / Balanced / Ultra, plus sliders for everything in the options screen
 
 ## Install

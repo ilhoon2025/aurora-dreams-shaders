@@ -1,51 +1,31 @@
 #version 120
-// Pass 3: screen-space god rays toward the sun / moon
+// Emitter pass 3: depth-aware blur (V, stage 1) spreading light colour across nearby surfaces
 #include "/lib/settings.glsl"
 
-uniform sampler2D colortex0;
-uniform sampler2D depthtex0;
+uniform sampler2D colortex4;
 uniform mat4 gbufferProjection;
-uniform vec3 shadowLightPosition;
 uniform float viewWidth;
 uniform float viewHeight;
-uniform int isEyeInWater;
 
 varying vec2 texcoord;
-varying vec3 lightCol;
-varying vec3 ambCol;
-varying vec3 gndCol;
-
-float ign(vec2 p) {
-    return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
-}
 
 void main() {
-    vec3 color = texture2D(colortex0, texcoord).rgb;
-#ifdef GODRAYS
-    vec4 sp = gbufferProjection * vec4(shadowLightPosition, 1.0);
-    if (sp.w > 0.0 && isEyeInWater == 0) {
-        vec2 suv = sp.xy / sp.w * 0.5 + 0.5;
-        vec2 delta = suv - texcoord;
-        const int N = 16;
-        vec2 stepv = delta / float(N) * 0.95;
-        vec2 uv = texcoord + stepv * ign(gl_FragCoord.xy);
-        float acc = 0.0;
-        float w = 1.0;
-        float wsum = 0.0;
-        for (int i = 0; i < N; i++) {
-            uv += stepv;
-            if (uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0) {
-                acc += step(1.0, texture2D(depthtex0, uv).r) * w;
-            }
-            wsum += w;
-            w *= 0.94;
-        }
-        acc /= wsum;
-        vec2 ad = delta * vec2(viewWidth / viewHeight, 1.0);
-        float falloff = 1.0 / (1.0 + dot(ad, ad) * 6.0);
-        color += lightCol * acc * falloff * 0.22 * GODRAYS_STRENGTH;
+    vec4 c = texture2D(colortex4, texcoord);
+#ifdef EMITTER_LIGHT
+    float D = c.a;
+    float ppu = 0.5 * viewHeight * gbufferProjection[1][1] / max(D, 0.5); // pixels per block here
+    float stride = clamp(0.1 * ppu, 1.0, 3.0);
+    vec2 dir = vec2(0.0, 1.0) / vec2(viewWidth, viewHeight) * stride;
+    vec3 sum = vec3(0.0);
+    float wsum = 0.0;
+    for (int i = -4; i <= 4; i++) {
+        vec4 s = texture2D(colortex4, texcoord + dir * float(i));
+        float g = exp(-float(i * i) / 9.0);
+        sum += s.rgb * g * exp(-abs(s.a - D) * 0.9);
+        wsum += g;
     }
+    c = vec4(sum / wsum, D);
 #endif
-/* DRAWBUFFERS:0 */
-    gl_FragData[0] = vec4(color, 1.0);
+/* DRAWBUFFERS:3 */
+    gl_FragData[0] = c;
 }

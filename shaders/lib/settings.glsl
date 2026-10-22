@@ -3,6 +3,9 @@
 #define SHADOW_RES 2048 // [1024 2048 3072 4096]
 #define SHADOW_DIST 96.0 // [64.0 96.0 128.0 192.0]
 #define SSAO
+#define EMITTER_LIGHT
+#define COLORED_SHADOWS
+#define WET_SURFACES
 #define WAVING
 #define WAVING_STRENGTH 1.0 // [0.5 1.0 1.5 2.0]
 
@@ -12,6 +15,7 @@
 #define AURORA_INTENSITY 1.0 // [0.5 1.0 1.5 2.0]
 #define GODRAYS
 #define GODRAYS_STRENGTH 1.0 // [0.5 1.0 1.5 2.0]
+#define LENS_FLARE
 
 #define SSR
 #define WATER_WAVE 1.0 // [0.5 1.0 1.5 2.0]
