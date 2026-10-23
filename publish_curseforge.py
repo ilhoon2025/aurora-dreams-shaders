@@ -9,7 +9,7 @@ import json, os, pathlib, sys, urllib.request, uuid
 
 PROJECT_ID = 1759474
 VERSION = sys.argv[1] if len(sys.argv) > 1 else "1.3.0"
-GAME_VERSION_NAMES = ["26.3", "Iris", "OptiFine"]
+GAME_VERSION_NAMES = ["26.2", "26.3", "Iris", "OptiFine"]
 TOKEN = os.environ["CURSEFORGE_TOKEN"]
 ROOT = pathlib.Path(__file__).parent
 ZIP = ROOT / "dist" / f"AuroraDreams-{VERSION} 26.3.zip"
@@ -32,7 +32,7 @@ ids = [v["id"] for v in versions if v["name"] in GAME_VERSION_NAMES and v["gameV
 if not ids:
     sys.exit(f"No CurseForge game version matches {GAME_VERSION_NAMES}")
 
-meta = {"changelog": "Smooth vanilla-style coloured block light, soul/redstone light tint, glowing ores, coloured glass shadows, lens flare, volumetric clouds, aurora night sky.",
+meta = {"changelog": "OptiFine fix: shadow resolution/distance are now const options so every shader program loads on OptiFine. Tested: Iris 1.11.7 on 26.3; OptiFine HD U K2 pre5 on 26.2 (no OptiFine build for 26.3 yet).",
         "changelogType": "markdown", "displayName": f"AuroraDreams-{VERSION} 26.3",
         "gameVersions": ids, "releaseType": "release"}
 b = uuid.uuid4().hex

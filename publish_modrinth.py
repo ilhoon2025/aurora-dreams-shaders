@@ -12,7 +12,7 @@ TOKEN = os.environ["MODRINTH_TOKEN"]
 UA = "ilhoon2025/aurora-dreams-publisher/1.3.0 (manager4ut@gmail.com)"
 ROOT = pathlib.Path(__file__).parent
 ZIP = ROOT / "dist" / f"AuroraDreams-{VERSION}.zip"
-GAME_VERSIONS = ["26.3"]
+GAME_VERSIONS = ["26.2", "26.3"]
 SLUG = "aurora-dreams"
 
 
@@ -72,7 +72,7 @@ if project is None:
 
 vdata = {
     "name": f"Aurora Dreams {VERSION}", "version_number": VERSION,
-    "changelog": "Smooth vanilla-style coloured block light (no disc glow), coloured light tint for soul/redstone torches, glowing ores, coloured glass shadows, lens flare.",
+    "changelog": "OptiFine fix: shadow resolution/distance are now const options so every shader program loads on OptiFine. Tested: Iris 1.11.7 on 26.3; OptiFine HD U K2 pre5 on 26.2 (no OptiFine build for 26.3 exists yet).",
     "dependencies": [], "game_versions": GAME_VERSIONS, "version_type": "release",
     "loaders": ["iris", "optifine"], "featured": True, "project_id": project["id"],
     "file_parts": ["file"], "primary_file": "file",
