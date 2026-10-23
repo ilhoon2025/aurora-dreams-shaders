@@ -72,7 +72,7 @@ if project is None:
 
 vdata = {
     "name": f"Aurora Dreams {VERSION}", "version_number": VERSION,
-    "changelog": "See https://github.com/ilhoon2025/aurora-dreams-shaders/releases",
+    "changelog": "Smooth vanilla-style coloured block light (no disc glow), coloured light tint for soul/redstone torches, glowing ores, coloured glass shadows, lens flare.",
     "dependencies": [], "game_versions": GAME_VERSIONS, "version_type": "release",
     "loaders": ["iris", "optifine"], "featured": True, "project_id": project["id"],
     "file_parts": ["file"], "primary_file": "file",
