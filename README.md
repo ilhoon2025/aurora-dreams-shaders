@@ -34,9 +34,9 @@ A dreamy, cinematic shader pack for Minecraft (Java Edition) built for **Iris** 
 Tip: nights are best seen with clear weather and a clear view of the sky.
 
 ## Compatibility
-- Minecraft 1.17+ with Iris or OptiFine (GLSL 1.20, `#include` support required).
-- Water is flagged by the block id `10002`, foliage by `10000`/`10001` in `block.properties`.
-- Tested for GLSL compile-correctness with Khronos `glslang`; visual tuning is ongoing - issues and screenshots are welcome.
+- **Iris** (recommended): tested on Minecraft 26.3 with Iris 1.11.7 + Sodium 0.9.2.
+- **OptiFine**: tested on Minecraft 26.2 with OptiFine HD U K2 pre5 (preview): all 26 shader programs compile and the pack renders. A visual check was done for terrain, shadows, sky and clouds only. There is no OptiFine build for 26.3 yet, so OptiFine on 26.3 is untested.
+- Requires GLSL 1.20 and `#include` support. Water is flagged by block id `10002`, foliage by `10000`/`10001` in `block.properties`.
 
 ## Building the zip
 ```

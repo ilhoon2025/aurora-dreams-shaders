@@ -1,8 +1,6 @@
 #version 120
 #include "/lib/settings.glsl"
 
-const int shadowMapResolution = SHADOW_RES;
-const float shadowDistance = SHADOW_DIST;
 
 uniform sampler2D texture;
 

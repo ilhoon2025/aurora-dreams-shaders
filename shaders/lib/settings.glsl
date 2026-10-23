@@ -1,7 +1,10 @@
 // Aurora Dreams - user options (shown in the shader options screen)
 
-#define SHADOW_RES 2048 // [1024 2048 3072 4096]
-#define SHADOW_DIST 96.0 // [64.0 96.0 128.0 192.0]
+// OptiFine reads these two as integer/float literals (it does not expand macros), so they are const options
+const int shadowMapResolution = 2048; // [1024 2048 3072 4096]
+const float shadowDistance = 96.0; // [64.0 96.0 128.0 192.0]
+#define SHADOW_RES shadowMapResolution
+#define SHADOW_DIST shadowDistance
 #define SSAO
 #define EMITTER_LIGHT
 #define COLORED_SHADOWS

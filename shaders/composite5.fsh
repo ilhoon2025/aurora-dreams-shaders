@@ -2,8 +2,6 @@
 // Pass 1: deferred lighting (sun/moon shadows, sky ambient, torch light, SSAO)
 #include "/lib/settings.glsl"
 
-const int shadowMapResolution = SHADOW_RES;
-const float shadowDistance = SHADOW_DIST;
 const float sunPathRotation = -25.0;
 
 uniform sampler2D colortex0;
