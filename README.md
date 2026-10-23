@@ -4,6 +4,13 @@
 
 A dreamy, cinematic shader pack for Minecraft (Java Edition) built for **Iris** and **OptiFine**.
 
+## Screenshots
+
+![Ocean at sunset](assets/gallery/01-ocean-sunset.jpg)
+![Sunrise god rays](assets/gallery/02-sunrise-godrays.jpg)
+![Glowing ores](assets/gallery/03-cave-glowing-ores.jpg)
+![Aurora night](assets/gallery/04-aurora-night.jpg)
+
 ## Features
 - **Night-sky aurora borealis** with procedural stars, moon glow and twinkling
 - Dynamic sky: deep-blue day gradient, rose/orange sunrise and sunset, rain overcast

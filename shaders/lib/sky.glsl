@@ -124,13 +124,13 @@ vec3 skyAurora(vec3 wd, float night) {
         vec2 p = wd.xz / wd.y * hgt;
         float n = fbm(p * 0.045 + vec2(t * 0.012, fi * 0.7));
         float band = 1.0 - abs(n * 2.0 - 1.0);
-        band = pow(band, 7.0);
+        band = pow(band, 11.0);
         float rays = 0.55 + 0.45 * vnoise(vec2(p.x * 0.35 + t * 0.25, p.y * 0.06));
         vec3 col = mix(vec3(0.10, 1.00, 0.45), vec3(0.50, 0.22, 1.00), smoothstep(0.25, 1.0, fi));
         col = mix(col, vec3(1.0, 0.2, 0.55), smoothstep(0.85, 1.0, fi) * 0.5);
         acc += col * band * rays * (1.0 - fi * 0.45);
     }
-    acc *= 0.62 * smoothstep(0.03, 0.4, wd.y) * night * (1.0 - rainStrength) * AURORA_INTENSITY;
+    acc *= 0.34 * smoothstep(0.03, 0.4, wd.y) * night * (1.0 - rainStrength) * AURORA_INTENSITY;
 #endif
     return acc;
 }
@@ -178,7 +178,7 @@ vec3 skyFull(vec3 dirV) {
 #ifdef CLOUDS
     vec3 sunW = mat3(gbufferModelViewInverse) * normalize(sunPosition);
     vec3 Ldir = skySunHeight() > -0.05 ? sunW : -sunW;
-    vec3 ambC = skyBase(normalize(upPosition)) * 0.9 + vec3(0.01, 0.012, 0.02);
+    vec3 ambC = skyBase(normalize(upPosition)) * 0.9 + vec3(0.01, 0.012, 0.02) + vec3(0.014, 0.020, 0.042) * night;
     vec4 cl = skyClouds(wd, Ldir, skyLightColor(), ambC);
     sky = sky * cl.a + cl.rgb;
 #endif

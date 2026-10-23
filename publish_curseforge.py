@@ -9,10 +9,10 @@ import json, os, pathlib, sys, urllib.request, uuid
 
 PROJECT_ID = 1759474
 VERSION = sys.argv[1] if len(sys.argv) > 1 else "1.3.0"
-GAME_VERSION_NAMES = ["26.3"]
+GAME_VERSION_NAMES = ["26.3", "Iris", "OptiFine"]
 TOKEN = os.environ["CURSEFORGE_TOKEN"]
 ROOT = pathlib.Path(__file__).parent
-ZIP = ROOT / "dist" / f"AuroraDreams-{VERSION}.zip"
+ZIP = ROOT / "dist" / f"AuroraDreams-{VERSION} 26.3.zip"
 BASE = "https://minecraft.curseforge.com/api"
 
 
@@ -27,12 +27,13 @@ def req(method, path, body=None, ctype=None):
 
 
 versions = req("GET", "/game/versions")
-ids = [v["id"] for v in versions if v["name"] in GAME_VERSION_NAMES]
+# each name can appear under several version types; type 1 is a legacy duplicate
+ids = [v["id"] for v in versions if v["name"] in GAME_VERSION_NAMES and v["gameVersionTypeID"] != 1]
 if not ids:
     sys.exit(f"No CurseForge game version matches {GAME_VERSION_NAMES}")
 
-meta = {"changelog": "See https://github.com/ilhoon2025/aurora-dreams-shaders/releases",
-        "changelogType": "markdown", "displayName": f"Aurora Dreams {VERSION}",
+meta = {"changelog": "Smooth vanilla-style coloured block light, soul/redstone light tint, glowing ores, coloured glass shadows, lens flare, volumetric clouds, aurora night sky.",
+        "changelogType": "markdown", "displayName": f"AuroraDreams-{VERSION} 26.3",
         "gameVersions": ids, "releaseType": "release"}
 b = uuid.uuid4().hex
 body = (f'--{b}\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n{json.dumps(meta)}\r\n'
