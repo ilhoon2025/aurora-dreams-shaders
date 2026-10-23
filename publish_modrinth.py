@@ -57,7 +57,7 @@ if project is None:
         "description": "A cinematic shader: aurora night sky, volumetric clouds, soft shadows, SSR water, coloured light.",
         "body": (ROOT / "README.md").read_text(encoding="utf-8"),
         "categories": ["fantasy", "semi-realistic"],
-        "additional_categories": ["atmosphere", "bloom", "colored-lighting", "foliage", "reflections", "shadows", "medium"],
+        "additional_categories": ["atmosphere", "bloom", "colored-lighting", "reflections", "shadows", "medium"],
         "client_side": "required", "server_side": "unsupported",
         "license_id": "MIT", "source_url": "https://github.com/ilhoon2025/aurora-dreams-shaders",
         "is_draft": True, "initial_versions": [], "organization_id": None,
