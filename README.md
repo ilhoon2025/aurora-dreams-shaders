@@ -38,6 +38,18 @@ Tip: nights are best seen with clear weather and a clear view of the sky.
 - **OptiFine**: tested on Minecraft 26.2 with OptiFine HD U K2 pre5 (preview): all 26 shader programs compile and the pack renders. A visual check was done for terrain, shadows, sky and clouds only. There is no OptiFine build for 26.3 yet, so OptiFine on 26.3 is untested.
 - Requires GLSL 1.20 and `#include` support. Water is flagged by block id `10002`, foliage by `10000`/`10001` in `block.properties`.
 
+## Legacy edition (Minecraft 1.8.9)
+A separate download, **Aurora Dreams Legacy**, runs on **Minecraft 1.8.9 with OptiFine HD U M5**.
+It is built from the same shader source (`python build_legacy.py`), with 1.8.9 block/item id mappings from `legacy/`.
+
+- Same features as the main pack: aurora night sky, volumetric clouds, soft shadows, SSAO, water waves/SSR/foam, waving foliage, god rays, bloom, coloured light, glowing ores.
+- Tested: Minecraft 1.8.9 + OptiFine HD U M5 (Java 8) on an NVIDIA MX450: every shader program loads with zero errors. Other GPUs are untested.
+- OptiFine only (Iris does not exist for 1.8.9).
+
+![Legacy ocean](assets/gallery-legacy/01-ocean-day.jpg)
+![Legacy sunset](assets/gallery-legacy/02-sunset-godrays.jpg)
+![Legacy aurora](assets/gallery-legacy/03-aurora-night.jpg)
+
 ## Building the zip
 ```
 python build.py
